@@ -417,13 +417,14 @@ bool HidlSensorHalWrapper::connectHidlService() {
 }
 
 ISensorHalWrapper::HalConnectionStatus HidlSensorHalWrapper::connectHidlServiceV1_0() {
-    // SensorDevice will wait for HAL service to start if HAL is declared in device manifest.
+    // Use tryGetService to avoid blocking indefinitely if the sensor HAL is absent or
+    // fails to start. If the service is not registered, return DOES_NOT_EXIST immediately.
     size_t retry = 10;
     HalConnectionStatus connectionStatus = HalConnectionStatus::UNKNOWN;
 
     while (retry-- > 0) {
         sp<android::hardware::sensors::V1_0::ISensors> sensors =
-                android::hardware::sensors::V1_0::ISensors::getService();
+                android::hardware::sensors::V1_0::ISensors::tryGetService();
         if (sensors == nullptr) {
             // no sensor hidl service found
             connectionStatus = HalConnectionStatus::DOES_NOT_EXIST;
@@ -454,7 +455,7 @@ ISensorHalWrapper::HalConnectionStatus HidlSensorHalWrapper::connectHidlServiceV
 ISensorHalWrapper::HalConnectionStatus HidlSensorHalWrapper::connectHidlServiceV2_0() {
     HalConnectionStatus connectionStatus = HalConnectionStatus::UNKNOWN;
     sp<android::hardware::sensors::V2_0::ISensors> sensors =
-            android::hardware::sensors::V2_0::ISensors::getService();
+            android::hardware::sensors::V2_0::ISensors::tryGetService();
 
     if (sensors == nullptr) {
         connectionStatus = HalConnectionStatus::DOES_NOT_EXIST;
@@ -469,7 +470,7 @@ ISensorHalWrapper::HalConnectionStatus HidlSensorHalWrapper::connectHidlServiceV
 ISensorHalWrapper::HalConnectionStatus HidlSensorHalWrapper::connectHidlServiceV2_1() {
     HalConnectionStatus connectionStatus = HalConnectionStatus::UNKNOWN;
     sp<android::hardware::sensors::V2_1::ISensors> sensors =
-            android::hardware::sensors::V2_1::ISensors::getService();
+            android::hardware::sensors::V2_1::ISensors::tryGetService();
 
     if (sensors == nullptr) {
         connectionStatus = HalConnectionStatus::DOES_NOT_EXIST;
