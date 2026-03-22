@@ -95,6 +95,7 @@ bool findSensorNameInList(int32_t handle, const Vector<Sensor>& sensorList,
 }  // namespace
 
 Mutex SensorManager::sLock;
+bool SensorManager::sSensorServiceUnavailable = false;
 std::map<String16, SensorManager*> SensorManager::sPackageInstances;
 
 SensorManager& SensorManager::getInstanceForPackage(const String16& packageName) {
@@ -175,23 +176,21 @@ SensorManager::~SensorManager() {
 }
 
 status_t SensorManager::waitForSensorService(sp<ISensorServer> *server) {
-    // try for 300 seconds (60*5(getService() tries for 5 seconds)) before giving up ...
-    sp<ISensorServer> s;
+    // Try for up to 5 seconds using non-blocking checkService to avoid stalling
+    // system_server on devices where sensorservice is permanently unavailable
+    // (e.g. legacy devices with missing sensor HAL blobs). getService() in
+    // Android 16 blocks ~6s per call via lazy HAL startup; checkService()
+    // returns immediately if the service is not yet registered.
     const String16 name("sensorservice");
-    for (int i = 0; i < 60; i++) {
-        status_t err = getService(name, &s);
-        switch (err) {
-            case NAME_NOT_FOUND:
-                sleep(1);
-                continue;
-            case NO_ERROR:
-                if (server != nullptr) {
-                    *server = s;
-                }
-                return NO_ERROR;
-            default:
-                return err;
+    for (int i = 0; i < 5; i++) {
+        sp<IBinder> binder = defaultServiceManager()->checkService(name);
+        if (binder != nullptr) {
+            if (server != nullptr) {
+                *server = interface_cast<ISensorServer>(binder);
+            }
+            return NO_ERROR;
         }
+        sleep(1);
     }
     return TIMED_OUT;
 }
@@ -223,8 +222,15 @@ status_t SensorManager::assertStateLocked() {
     }
     if (initSensorManager) {
 #endif
+        if (sSensorServiceUnavailable) {
+            return NO_INIT;
+        }
         waitForSensorService(&mSensorServer);
-        LOG_ALWAYS_FATAL_IF(mSensorServer == nullptr, "getService(SensorService) NULL");
+        if (mSensorServer == nullptr) {
+            sSensorServiceUnavailable = true;
+            ALOGE("SensorManager: sensor service unavailable, sensors disabled");
+            return NO_INIT;
+        }
 
         class DeathObserver : public IBinder::DeathRecipient {
             SensorManager& mSensorManager;

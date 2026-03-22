@@ -89,6 +89,7 @@ private:
     Mutex mLock;
     sp<ISensorServer> mSensorServer;
     Sensor const** mSensorList;
+    static bool sSensorServiceUnavailable;
     Vector<Sensor> mSensors;
     Sensor const** mDynamicSensorList = nullptr;
     Vector<Sensor> mDynamicSensors;
