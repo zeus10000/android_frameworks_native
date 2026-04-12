@@ -19,6 +19,7 @@
 
 #include "SkiaGLRenderEngine.h"
 
+#include <cstring>
 #include <EGL/egl.h>
 #include <EGL/eglext.h>
 #include <android-base/stringprintf.h>
@@ -84,10 +85,25 @@ static status_t selectConfigForAttribute(EGLDisplay dpy, EGLint const* attrs, EG
     return NAME_NOT_FOUND;
 }
 
+static bool hasEglExtension(EGLDisplay display, const char* extension) {
+    const char* exts = eglQueryString(display, EGL_EXTENSIONS);
+    if (!exts) return false;
+    size_t extlen = strlen(extension);
+    const char* p = exts;
+    while ((p = strstr(p, extension)) != nullptr) {
+        const char end = p[extlen];
+        if ((p == exts || p[-1] == ' ') && (end == ' ' || end == '\0'))
+            return true;
+        p += extlen;
+    }
+    return false;
+}
+
 static status_t selectEGLConfig(EGLDisplay display, EGLint format, EGLint renderableType,
                                 EGLConfig* config) {
     // select our EGLConfig. It must support EGL_RECORDABLE_ANDROID if
-    // it is to be used with WIFI displays
+    // it is to be used with WIFI displays, and EGL_FRAMEBUFFER_TARGET_ANDROID
+    // if the driver advertises EGL_ANDROID_framebuffer_target.
     status_t err;
     EGLint wantedAttribute;
     EGLint wantedAttributeValue;
@@ -96,29 +112,31 @@ static status_t selectEGLConfig(EGLDisplay display, EGLint format, EGLint render
     if (renderableType) {
         const ui::PixelFormat pixelFormat = static_cast<ui::PixelFormat>(format);
         const bool is1010102 = pixelFormat == ui::PixelFormat::RGBA_1010102;
+        const bool hasFramebufferTarget =
+                hasEglExtension(display, "EGL_ANDROID_framebuffer_target");
+        const bool hasRecordable = hasEglExtension(display, "EGL_ANDROID_recordable");
 
-        // Default to 8 bits per channel.
-        const EGLint tmpAttribs[] = {
-                EGL_RENDERABLE_TYPE,
-                renderableType,
-                // EGL_RECORDABLE_ANDROID removed for legacy GPU compat
-                // EGL_TRUE,
-                EGL_SURFACE_TYPE,
-                EGL_WINDOW_BIT | EGL_PBUFFER_BIT,
-                // EGL_FRAMEBUFFER_TARGET_ANDROID removed for legacy GPU compat
-                // EGL_TRUE,
-                EGL_RED_SIZE,
-                is1010102 ? 10 : 8,
-                EGL_GREEN_SIZE,
-                is1010102 ? 10 : 8,
-                EGL_BLUE_SIZE,
-                is1010102 ? 10 : 8,
-                EGL_ALPHA_SIZE,
-                is1010102 ? 2 : 8,
-                EGL_NONE,
-        };
-        std::copy(tmpAttribs, tmpAttribs + (sizeof(tmpAttribs) / sizeof(EGLint)),
-                  std::back_inserter(attribs));
+        attribs.push_back(EGL_RENDERABLE_TYPE);
+        attribs.push_back(renderableType);
+        if (hasRecordable) {
+            attribs.push_back(EGL_RECORDABLE_ANDROID);
+            attribs.push_back(EGL_TRUE);
+        }
+        attribs.push_back(EGL_SURFACE_TYPE);
+        attribs.push_back(EGL_WINDOW_BIT | EGL_PBUFFER_BIT);
+        if (hasFramebufferTarget) {
+            attribs.push_back(EGL_FRAMEBUFFER_TARGET_ANDROID);
+            attribs.push_back(EGL_TRUE);
+        }
+        attribs.push_back(EGL_RED_SIZE);
+        attribs.push_back(is1010102 ? 10 : 8);
+        attribs.push_back(EGL_GREEN_SIZE);
+        attribs.push_back(is1010102 ? 10 : 8);
+        attribs.push_back(EGL_BLUE_SIZE);
+        attribs.push_back(is1010102 ? 10 : 8);
+        attribs.push_back(EGL_ALPHA_SIZE);
+        attribs.push_back(is1010102 ? 2 : 8);
+        attribs.push_back(EGL_NONE);
         wantedAttribute = EGL_NONE;
         wantedAttributeValue = EGL_NONE;
     } else {
