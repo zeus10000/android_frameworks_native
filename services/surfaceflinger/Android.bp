@@ -12,11 +12,11 @@ aconfig_declarations {
     name: "surfaceflinger_flags",
     package: "com.android.graphics.surfaceflinger.flags",
     container: "system",
+    exportable: true,
     srcs: [
         "surfaceflinger_flags.aconfig",
         "surfaceflinger_flags_new.aconfig",
     ],
-    exportable: true,
 }
 
 cc_aconfig_library {

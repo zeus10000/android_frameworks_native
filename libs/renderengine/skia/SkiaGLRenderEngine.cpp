@@ -101,12 +101,12 @@ static status_t selectEGLConfig(EGLDisplay display, EGLint format, EGLint render
         const EGLint tmpAttribs[] = {
                 EGL_RENDERABLE_TYPE,
                 renderableType,
-                EGL_RECORDABLE_ANDROID,
-                EGL_TRUE,
+                // EGL_RECORDABLE_ANDROID removed for legacy GPU compat
+                // EGL_TRUE,
                 EGL_SURFACE_TYPE,
                 EGL_WINDOW_BIT | EGL_PBUFFER_BIT,
-                EGL_FRAMEBUFFER_TARGET_ANDROID,
-                EGL_TRUE,
+                // EGL_FRAMEBUFFER_TARGET_ANDROID removed for legacy GPU compat
+                // EGL_TRUE,
                 EGL_RED_SIZE,
                 is1010102 ? 10 : 8,
                 EGL_GREEN_SIZE,
